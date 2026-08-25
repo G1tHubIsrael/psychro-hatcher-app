@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0b0f10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PsychroCalc">
+<meta name="description" content="Offline-first psychrometric calculator and hatcher batch tracker for duck hatchery operations.">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-32.png" sizes="32x32">
+<link rel="icon" href="./icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<title>Psychrometric Calculator</title>
+<style>
+  :root{
+    --bg-0:#0a0d0e;
+    --bg-1:#12181a;
+    --panel:#161e21;
+    --panel-2:#1b2427;
+    --border:#263136;
+    --border-lit:#3d5058;
+    --text:#cfd8da;
+    --text-dim:#6c7a80;
+    --amber:#ffb454;
+    --amber-dim:#5a4324;
+    --cyan:#5fd8cf;
+    --cyan-dim:#1f3d3a;
+    --coral:#ff8a68;
+    --coral-dim:#4a2a20;
+    --violet:#b79bff;
+    --green-ok:#7ed99a;
+    --radius-lg:16px;
+    --radius-md:12px;
+    --radius-sm:9px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1100px 700px at 50% -12%, #1a2428 0%, var(--bg-0) 58%);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;
+    justify-content:center;
+    padding:20px 12px 44px;
+  }
+  .device{ width:100%; max-width:460px; }
+
+  .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    column-gap:10px;
+    row-gap:2px;
+    padding:2px 4px 16px;
+  }
+  .brand h1{
+    font-size:15px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:700;
+    color:var(--text);
+    margin:0;
+  }
+  .brand span{
+    font-size:9.5px;
+    letter-spacing:.09em;
+    color:var(--green-ok);
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+  }
+  .brand span.offline{ color:var(--text-dim); }
+
+  /* Top-level app tabs — horizontal scroll strip so it scales past 4 items */
+  .app-tabs{
+    display:flex;
+    overflow-x:auto;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:4px;
+    gap:4px;
+    margin-bottom:12px;
+  }
+  .app-tabs::-webkit-scrollbar{ display:none; }
+  .app-tab{
+    flex:0 0 auto;
+    text-align:center;
+    padding:11px 14px;
+    font-size:11px;
+    line-height:1.25;
+    font-weight:700;
+    letter-spacing:.02em;
+    color:var(--text-dim);
+    border-radius:8px;
+    cursor:pointer;
+    user-select:none;
+    white-space:nowrap;
+    transition:background .15s ease, color .15s ease;
+  }
+  .app-tab.active{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    color:var(--amber);
+    box-shadow:0 0 0 1px var(--border-lit) inset;
+  }
+
+  /* Segmented sub-control (3-way: known secondary value) */
+  .seg{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:11px;
+    padding:3px;
+    gap:3px;
+    margin-bottom:12px;
+  }
+  .seg-item{
+    text-align:center;
+    padding:9px 4px;
+    font-size:10.5px;
+    line-height:1.3;
+    font-weight:700;
+    letter-spacing:.02em;
+    color:var(--text-dim);
+    border-radius:8px;
+    cursor:pointer;
+    user-select:none;
+    transition:background .15s ease, color .15s ease;
+  }
+  .seg-item.active{
+    background:var(--panel-2);
+    color:var(--cyan);
+    box-shadow:0 0 0 1px var(--border-lit) inset;
+  }
+
+  /* Panel */
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--bg-1));
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:16px;
+    margin-bottom:12px;
+    box-shadow:0 1px 0 rgba(255,255,255,.02) inset, 0 12px 30px rgba(0,0,0,.35);
+  }
+  .panel-title{
+    font-size:10px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin:0 0 10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+
+  /* Inputs */
+  .field{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:11px 13px;
+    margin-bottom:8px;
+    transition:box-shadow .15s ease, border-color .15s ease;
+  }
+  .field:focus-within{
+    border-color:var(--border-lit);
+    box-shadow:0 0 0 1px var(--border-lit) inset;
+  }
+  .field label{
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-weight:600;
+  }
+  .field .unit-inline{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-left:6px;
+  }
+  .field input[type=number], .field input[type=text], .field input[type=date]{
+    width:120px;
+    text-align:right;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--amber);
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:16px;
+    font-weight:600;
+    -moz-appearance:textfield;
+  }
+  .field input[type=number]::-webkit-outer-spin-button,
+  .field input[type=number]::-webkit-inner-spin-button{
+    -webkit-appearance:none; margin:0;
+  }
+
+  .unit-row{ display:flex; gap:6px; margin-bottom:8px; }
+  .unit-btn{
+    flex:1;
+    text-align:center;
+    padding:8px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    border-radius:8px;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    background:var(--bg-1);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .unit-btn.active{
+    color:var(--bg-0);
+    background:var(--amber);
+    border-color:var(--amber);
+  }
+
+  .adv-toggle{
+    font-size:10.5px;
+    color:var(--text-dim);
+    text-align:right;
+    padding:2px 2px 0;
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  .adv-wrap{ max-height:0; overflow:hidden; transition:max-height .2s ease; }
+  .adv-wrap.open{ max-height:120px; margin-top:8px; }
+
+  /* Results grid */
+  .results{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .tile{
+    position:relative;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:12px 13px;
+    overflow:hidden;
+  }
+  .tile.is-input{
+    border-color:var(--border-lit);
+    box-shadow:0 0 0 1px var(--border-lit) inset;
+  }
+  .tile .tlabel{
+    font-size:9.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:5px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .tile .tag-input{
+    font-size:8px;
+    letter-spacing:.08em;
+    color:var(--bg-0);
+    background:var(--text-dim);
+    padding:2px 5px;
+    border-radius:5px;
+    font-weight:700;
+  }
+  .tile .tvalue{
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:23px;
+    font-weight:700;
+  }
+  .tile .tnote{
+    font-size:9px;
+    color:var(--text-dim);
+    margin-top:3px;
+    line-height:1.4;
+  }
+  .tile.rh .tvalue{ color:var(--amber); }
+  .tile.twb .tvalue{ color:var(--green-ok); }
+  .tile.dp .tvalue{ color:var(--cyan); }
+  .tile.hi .tvalue{ color:var(--coral); }
+
+  .warn{
+    font-size:11px;
+    color:var(--text-dim);
+    background:var(--bg-1);
+    border:1px dashed var(--border);
+    border-radius:8px;
+    padding:9px 11px;
+    margin-top:10px;
+    line-height:1.5;
+  }
+  .warn b{ color:var(--coral); font-weight:700; }
+
+  /* Converter view */
+  .conv-field{
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:16px;
+    margin-bottom:10px;
+    transition:box-shadow .15s ease, border-color .15s ease;
+  }
+  .conv-field:focus-within{
+    border-color:var(--border-lit);
+    box-shadow:0 0 0 1px var(--border-lit) inset;
+  }
+  .conv-field .clabel{
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:8px;
+  }
+  .conv-field .crow{ display:flex; align-items:baseline; gap:8px; }
+  .conv-field input[type=number]{
+    flex:1;
+    min-width:0;
+    background:transparent;
+    border:none;
+    outline:none;
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:34px;
+    font-weight:700;
+  }
+  #convC{ color:var(--cyan); }
+  #convF{ color:var(--coral); }
+  .conv-field .csuffix{ font-size:18px; color:var(--text-dim); font-weight:600; }
+
+  .conv-swap{
+    display:flex;
+    justify-content:center;
+    margin:-4px 0 10px;
+  }
+  .conv-swap svg{ opacity:.55; }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .chip{
+    font-size:10.5px;
+    font-weight:600;
+    color:var(--text-dim);
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    padding:6px 10px;
+    border-radius:999px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .chip:hover{ border-color:var(--border-lit); color:var(--text); }
+
+  /* Guide view (accordion) */
+  .guide-intro{
+    font-size:11.5px;
+    color:var(--text-dim);
+    line-height:1.6;
+    margin:0 0 12px;
+    padding:0 2px;
+  }
+  .acc{
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    margin-bottom:8px;
+    overflow:hidden;
+    background:var(--bg-1);
+  }
+  .acc-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:13px 14px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .acc-head .acc-num{
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:10px;
+    color:var(--bg-0);
+    background:var(--cyan);
+    width:20px;
+    height:20px;
+    min-width:20px;
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+  }
+  .acc-head .acc-title{
+    flex:1;
+    font-size:13px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .acc-head .acc-chev{
+    font-size:11px;
+    color:var(--text-dim);
+    transition:transform .2s ease;
+  }
+  .acc.open .acc-head .acc-chev{ transform:rotate(180deg); }
+  .acc-body{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .25s ease;
+  }
+  .acc.open .acc-body{ max-height:2200px; }
+  .acc-body-inner{
+    padding:0 14px 15px;
+    font-size:12px;
+    line-height:1.65;
+    color:var(--text);
+    border-top:1px solid var(--border);
+    padding-top:12px;
+  }
+  .acc-body-inner p{ margin:0 0 10px; }
+  .acc-body-inner p:last-child{ margin-bottom:0; }
+  .acc-body-inner ul, .acc-body-inner ol{ margin:0 0 10px; padding-left:18px; }
+  .acc-body-inner li{ margin-bottom:6px; }
+  .acc-body-inner li:last-child{ margin-bottom:0; }
+  .acc-body-inner b{ color:var(--amber); }
+  .kpi-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin:2px 0 10px;
+  }
+  .kpi{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:9px 10px;
+  }
+  .kpi .klabel{
+    font-size:8.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:3px;
+  }
+  .kpi .kvalue{
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:15px;
+    font-weight:700;
+    color:var(--cyan);
+  }
+  .img-placeholder{
+    background:var(--panel-2);
+    border:1px dashed var(--border-lit);
+    border-radius:9px;
+    padding:16px 12px;
+    text-align:center;
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin:0 0 10px;
+    line-height:1.5;
+  }
+  .img-placeholder .ph-icon{ font-size:18px; display:block; margin-bottom:6px; opacity:.6; }
+  .callout{
+    background:var(--coral-dim);
+    border:1px solid #6b3a2c;
+    border-radius:9px;
+    padding:10px 12px;
+    font-size:11.5px;
+    line-height:1.5;
+    margin:0 0 10px;
+  }
+  .callout b{ color:var(--coral); }
+  .callout.ok{ background:var(--cyan-dim); border-color:#2a5a54; }
+  .callout.ok b{ color:var(--cyan); }
+  .checklist{ list-style:none; padding:0; margin:0 0 10px; }
+  .checklist li{
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
+    margin-bottom:8px;
+    font-size:12px;
+    line-height:1.55;
+  }
+  .checklist li:last-child{ margin-bottom:0; }
+  .checklist .cbox{
+    flex:none;
+    width:16px;
+    height:16px;
+    border-radius:4px;
+    border:1px solid var(--border-lit);
+    margin-top:2px;
+  }
+
+  /* Schedule table (Proposed Program) */
+  .table-scroll{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    border:1px solid var(--border);
+    border-radius:9px;
+    margin:0 0 10px;
+  }
+  .sched-table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:760px;
+    font-size:10px;
+  }
+  .sched-table th{
+    background:var(--panel-2);
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-size:8px;
+    font-weight:700;
+    padding:7px 6px;
+    text-align:right;
+    white-space:nowrap;
+    border-bottom:1px solid var(--border);
+    position:sticky;
+    top:0;
+  }
+  .sched-table th:first-child, .sched-table td:first-child{ text-align:left; }
+  .sched-table td{
+    padding:6px 6px;
+    text-align:right;
+    white-space:nowrap;
+    color:var(--text);
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    border-bottom:1px solid var(--border);
+  }
+  .sched-table tbody tr:last-child td{ border-bottom:none; }
+  .sched-table tbody tr:nth-child(even){ background:rgba(255,255,255,.02); }
+  .sched-table tr.takeoff td{ color:var(--amber); font-weight:700; }
+  .table-caption{
+    font-size:9.5px;
+    color:var(--text-dim);
+    text-align:center;
+    margin:-4px 0 10px;
+  }
+
+  /* Live profile tab */
+  .comfort-strip{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .stage-field{
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:11px 13px;
+    margin-bottom:8px;
+  }
+  .stage-field label{
+    display:block;
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  .stage-field .stage-hint{
+    font-size:10px;
+    font-weight:500;
+    color:var(--text-dim);
+    opacity:.75;
+  }
+  .stage-field select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border-lit);
+    border-radius:8px;
+    padding:9px 28px 9px 10px;
+    color:var(--amber);
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    font-size:12.5px;
+    font-weight:600;
+    outline:none;
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0 L5 6 L10 0 Z' fill='%236c7a80'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+  }
+  .stage-field select:focus{ border-color:var(--cyan); }
+  .stage-note{
+    font-size:10.5px;
+    color:var(--text-dim);
+    line-height:1.5;
+    margin-top:8px;
+  }
+  .stage-note b{ color:var(--cyan); }
+  .hi-guide{
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:10px 11px;
+  }
+  .hi-guide-title{
+    font-size:8.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    font-weight:700;
+    margin-bottom:7px;
+  }
+  .hi-guide-row{
+    display:flex;
+    align-items:flex-start;
+    gap:6px;
+    font-size:9.5px;
+    line-height:1.4;
+    color:var(--text);
+    margin-bottom:6px;
+  }
+  .hi-guide-row .dot{
+    width:7px;
+    height:7px;
+    min-width:7px;
+    border-radius:50%;
+    margin-top:3px;
+  }
+  .hi-guide-row.ok .dot{ background:var(--green-ok); }
+  .hi-guide-row.warn .dot{ background:var(--coral); }
+  .hi-guide-note{
+    font-size:8.5px;
+    color:var(--text-dim);
+    border-top:1px solid var(--border);
+    padding-top:7px;
+    line-height:1.4;
+  }
+
+  /* Buttons */
+  .btn{
+    display:block;
+    width:100%;
+    text-align:center;
+    padding:12px;
+    border-radius:var(--radius-md);
+    border:1px solid var(--border-lit);
+    background:var(--panel-2);
+    color:var(--text);
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .btn.primary{
+    background:var(--amber);
+    color:var(--bg-0);
+    border-color:var(--amber);
+  }
+  .btn.ghost{
+    background:transparent;
+  }
+  .btn.small{
+    display:inline-block;
+    width:auto;
+    padding:8px 12px;
+    font-size:11px;
+  }
+  .btn-row{ display:flex; gap:8px; }
+  .btn-row .btn{ flex:1; }
+
+  /* Batches tab */
+  .sync-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:.04em;
+    padding:5px 10px;
+    border-radius:999px;
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .sync-pill .dot{ width:6px; height:6px; border-radius:50%; background:var(--text-dim); }
+  .sync-pill.local .dot{ background:var(--text-dim); }
+  .sync-pill.pending .dot{ background:var(--amber); }
+  .sync-pill.syncing .dot{ background:var(--cyan); animation:pulse 1s infinite; }
+  .sync-pill.synced .dot{ background:var(--green-ok); }
+  .sync-pill.error .dot{ background:var(--coral); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  .batch-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:4px; }
+  .batch-card{
+    background:var(--bg-1);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:12px 13px;
+    cursor:pointer;
+  }
+  .batch-card.active{
+    border-color:var(--amber);
+    box-shadow:0 0 0 1px var(--amber) inset;
+  }
+  .batch-card .bname{ font-size:13px; font-weight:700; color:var(--text); }
+  .batch-card .bmeta{ font-size:10px; color:var(--text-dim); margin-top:3px; }
+  .batch-card .bcount{ font-size:10px; color:var(--cyan); margin-top:3px; }
+  .empty-state{
+    text-align:center;
+    color:var(--text-dim);
+    font-size:11.5px;
+    padding:18px 10px;
+    line-height:1.6;
+  }
+
+  .readings-table{ border-collapse:collapse; width:100%; min-width:520px; font-size:9.5px; }
+  .readings-table th{
+    background:var(--panel-2); color:var(--text-dim); text-transform:uppercase;
+    letter-spacing:.03em; font-size:8px; font-weight:700; padding:6px; text-align:right;
+    white-space:nowrap; border-bottom:1px solid var(--border);
+  }
+  .readings-table th:first-child, .readings-table td:first-child{ text-align:left; }
+  .readings-table td{
+    padding:6px; text-align:right; white-space:nowrap; color:var(--text);
+    font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+    border-bottom:1px solid var(--border);
+  }
+  .readings-table tbody tr:last-child td{ border-bottom:none; }
+  .readings-table .del-btn{ color:var(--coral); cursor:pointer; font-weight:700; }
+
+  .chart-block{ margin-bottom:12px; }
+  .chart-label{
+    font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim);
+    display:flex; justify-content:space-between; margin-bottom:4px;
+  }
+  .chart-label .cval{ color:var(--text); font-family:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace; }
+  .chart-svg{ width:100%; height:64px; display:block; }
+
+  footer{
+    text-align:center;
+    font-size:10px;
+    color:var(--text-dim);
+    letter-spacing:.05em;
+    margin-top:16px;
+    line-height:1.7;
+  }
+</style>
+</head>
+<body>
+<div class="device">
+
+  <div class="brand">
+    <h1>Psychrometric Calc</h1>
+    <span id="connBadge">● OFFLINE — NO DATA CONNECTION</span>
+  </div>
+
+  <div class="app-tabs">
+    <div class="app-tab active" data-view="psychro">Psychrometrics</div>
+    <div class="app-tab" data-view="convert">°C ⇄ °F</div>
+    <div class="app-tab" data-view="guide">Hatcher Guide</div>
+    <div class="app-tab" data-view="profile">Live Profile</div>
+    <div class="app-tab" data-view="batches">Batches</div>
+  </div>
+
+  <!-- ==================== PSYCHROMETRIC VIEW ==================== -->
+  <div id="view-psychro">
+
+    <div class="seg">
+      <div class="seg-item active" data-mode="twb">I know<br>Wet Bulb</div>
+      <div class="seg-item" data-mode="rh">I know<br>RH %</div>
+      <div class="seg-item" data-mode="hi">I know<br>Heat Index</div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Inputs</p>
+
+      <div class="unit-row">
+        <div class="unit-btn active" data-unit="C">°C</div>
+        <div class="unit-btn" data-unit="F">°F</div>
+      </div>
+
+      <div class="field">
+        <label>Dry bulb</label>
+        <div><input type="number" id="tdb" step="0.1" value="25.0"><span class="unit-inline" id="u-tdb">°C</span></div>
+      </div>
+
+      <div class="field" id="field-twb">
+        <label>Wet bulb</label>
+        <div><input type="number" id="twb" step="0.1" value="19.0"><span class="unit-inline" id="u-twb">°C</span></div>
+      </div>
+
+      <div class="field" id="field-rh" style="display:none">
+        <label>Relative humidity</label>
+        <div><input type="number" id="rhInput" step="0.5" value="60"><span class="unit-inline">%</span></div>
+      </div>
+
+      <div class="field" id="field-hi" style="display:none">
+        <label>Heat index</label>
+        <div><input type="number" id="hiInput" step="0.1" value="27.0"><span class="unit-inline" id="u-hi">°C</span></div>
+      </div>
+
+      <div class="adv-toggle" id="advToggle">Station pressure ▾</div>
+      <div class="adv-wrap" id="advWrap">
+        <div class="field">
+          <label>Pressure</label>
+          <div><input type="number" id="pressure" step="0.5" value="1013.25"><span class="unit-inline">hPa</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Reading</p>
+      <div class="results">
+        <div class="tile rh" id="tile-rh">
+          <div class="tlabel"><span>Relative Humidity</span><span class="tag-input" id="tag-rh" style="display:none">INPUT</span></div>
+          <div class="tvalue" id="rhOut">-- %</div>
+          <div class="tnote">% saturation at dry bulb</div>
+        </div>
+        <div class="tile twb" id="tile-twb">
+          <div class="tlabel"><span>Wet Bulb</span><span class="tag-input" id="tag-twb" style="display:none">INPUT</span></div>
+          <div class="tvalue" id="twbOut">-- °C</div>
+          <div class="tnote">Evaporative cooling limit</div>
+        </div>
+        <div class="tile dp" id="tile-dp">
+          <div class="tlabel"><span>Dew Point</span></div>
+          <div class="tvalue" id="dpOut">-- °C</div>
+          <div class="tnote">Condensation onset temp</div>
+        </div>
+        <div class="tile hi" id="tile-hi">
+          <div class="tlabel"><span>Heat Index</span><span class="tag-input" id="tag-hi" style="display:none">INPUT</span></div>
+          <div class="tvalue" id="hiOut">-- °C</div>
+          <div class="tnote" id="hiNote">Feels-like temp</div>
+        </div>
+      </div>
+      <div class="warn" id="warnBox" style="display:none"></div>
+    </div>
+
+  </div>
+
+  <!-- ==================== CONVERTER VIEW ==================== -->
+  <div id="view-convert" style="display:none">
+    <div class="panel">
+      <p class="panel-title">Temperature Converter</p>
+
+      <div class="conv-field">
+        <div class="clabel">Celsius</div>
+        <div class="crow"><input type="number" id="convC" step="0.1" value="25"><span class="csuffix">°C</span></div>
+      </div>
+
+      <div class="conv-swap">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim)">
+          <path d="M7 10 L12 15 L17 10"/>
+          <path d="M7 14 L12 9 L17 14" opacity="0"/>
+        </svg>
+      </div>
+
+      <div class="conv-field">
+        <div class="clabel">Fahrenheit</div>
+        <div class="crow"><input type="number" id="convF" step="0.1" value="77"><span class="csuffix">°F</span></div>
+      </div>
+
+      <div class="chips" id="convChips">
+        <div class="chip" data-c="-40">-40° (equal point)</div>
+        <div class="chip" data-c="0">0°C freezing</div>
+        <div class="chip" data-c="21">21°C room</div>
+        <div class="chip" data-c="37">37°C body</div>
+        <div class="chip" data-c="100">100°C boiling</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== HATCHER GUIDE VIEW ==================== -->
+  <div id="view-guide" style="display:none">
+    <div class="panel">
+      <p class="panel-title">Hatcher Program</p>
+      <p class="guide-intro">Reference SOP for hatcher management — objectives, egg shell temperature, ventilation, humidity, and hatch-window quality checks. Tap a section to expand.</p>
+
+      <div class="acc open" data-acc="1">
+        <div class="acc-head">
+          <span class="acc-num">1</span>
+          <span class="acc-title">Objectives</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <ol>
+            <li>Achieving optimum egg shell temperature of <b>100–100.5°F</b>.</li>
+            <li>Short hatch window — ideally <b>24–30 hours</b> from 1st bird to take-off.</li>
+            <li>Uniformed hatch.</li>
+            <li>On-time hatching (not early and not delayed).</li>
+            <li>Good hatch number.</li>
+            <li>Low number of culled birds.</li>
+          </ol>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="2">
+        <div class="acc-head">
+          <span class="acc-num">2</span>
+          <span class="acc-title">Egg Shell Temperature (EST)</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <div class="kpi-row">
+            <div class="kpi"><div class="klabel">Target EST</div><div class="kvalue">100–100.5°F</div></div>
+            <div class="kpi"><div class="klabel">Monitor from</div><div class="kvalue">Day 1</div></div>
+          </div>
+          <p>EST is the main factor for managing incubation temperature from setter to hatcher. It affects embryo development speed, moisture loss, bird quality, and hatch percentage.</p>
+          <p>EST is the basis for adjusting the temperature program. Knowing EST from Day 1 gives an advantage in managing embryo development — the timing of adjustments depends on embryonic heat production:</p>
+          <ul>
+            <li><b>First ~15 days:</b> embryo relies more on outside temperature; less embryonic heat produced.</li>
+            <li><b>Later stages:</b> embryonic heat production increases as the embryo grows — keeping the embryo cooler becomes the priority.</li>
+          </ul>
+          <p><b>How to measure:</b> keep EST monitoring consistent from Day 1 to hatching using a tiny-tag or small temperature logger placed close to the eggshell. Periodically cross-check with an ear thermometer on eggs inside the incubator.</p>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="3">
+        <div class="acc-head">
+          <span class="acc-num">3</span>
+          <span class="acc-title">Hatching — Effects of EST After Transfer</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <div class="callout"><b>EST too low:</b> reduced hatch number, longer hatch window, wet birds, more unhatched birds, birds with large belly (omphalitis), elevated 7-day farm mortality.</div>
+          <div class="callout"><b>EST too high:</b> accelerated hatching, non-uniform hatch, smaller/dehydrated birds, impaired organ development. Studies show reduced heart size and impaired gut development in early brooding; more late-stage deaths from exhaustion/overheating. Hatch number drop is smaller than with low EST, but bird quality and farm performance suffer.</div>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="4">
+        <div class="acc-head">
+          <span class="acc-num">4</span>
+          <span class="acc-title">Hatcher Cabinet Temperature Profile</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <div class="img-placeholder"><span class="ph-icon">▤</span>Chart: New Proposed Hatcher Temperature Profile — refer to printed SOP</div>
+          <p>Step-down is timed to the <b>percentage of birds hatched</b>, not the clock — this avoids forcing an early or slow hatch.</p>
+          <p>Once <b>100% of birds have hatched</b>, the machine becomes a holding cabinet and must be turned down significantly to prevent overheating.</p>
+          <div class="kpi-row">
+            <div class="kpi"><div class="klabel">Comfort cloacal temp</div><div class="kvalue">104–105°F</div></div>
+            <div class="kpi"><div class="klabel">Use for</div><div class="kvalue">Step-down timing</div></div>
+          </div>
+          <p>Measuring cloacal temperature at this stage tells you the birds' actual comfort level and guides the step-down before take-off.</p>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="5">
+        <div class="acc-head">
+          <span class="acc-num">5</span>
+          <span class="acc-title">Ventilation</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <p>Poor ventilation effects are hard to see at the hatchery but show up on the farm: high CO₂ leads to flat, lethargic birds with low 7-day bodyweights and elevated 7-day mortality.</p>
+          <p>Controlled elevated CO₂ can still help hatching — it narrows the hatch window and encourages a good transition from embryonic respiration to lung ventilation. Keeping CO₂ high until pipping can be beneficial.</p>
+          <div class="callout"><b>Hard limit:</b> keep CO₂ under 3000 ppm (or less) once birds are out, to prevent embryonic death and support post-hatch development.</div>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="6">
+        <div class="acc-head">
+          <span class="acc-num">6</span>
+          <span class="acc-title">Humidity</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <p>Humidity softens shell membranes so birds can emerge easily.</p>
+          <div class="kpi-row">
+            <div class="kpi"><div class="klabel">Set point after transfer</div><div class="kvalue">60% RH</div></div>
+            <div class="kpi"><div class="klabel">Peak during pipping</div><div class="kvalue">&gt;80% RH</div></div>
+          </div>
+          <p>RH naturally rises above 80% during pipping/hatching from moisture release, then should gradually decrease back to just above 60% once all birds are out.</p>
+          <div class="callout"><b>Too high:</b> prolongs hatching, affects hatch quality and window.<br><b>Too low:</b> also hurts both quality and hatch number.</div>
+          <p>Once birds are all out, keep humidity controlled — it directly affects heat index inside the hatcher.</p>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="7">
+        <div class="acc-head">
+          <span class="acc-num">7</span>
+          <span class="acc-title">Hatcher Profile View</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <p>Proposed step-down program — scroll sideways to see every column.</p>
+          <div class="table-scroll">
+            <table class="sched-table">
+              <thead>
+                <tr>
+                  <th>Day</th><th>Time (hr)</th><th>Temp °F</th><th>Hum %</th>
+                  <th>Dmp Full%</th><th>Dmp Part%</th><th>Hatch</th><th>Hatch %</th>
+                  <th>CO₂ ppm</th><th>EST °F</th><th>RH %</th><th>HI °F</th>
+                  <th>Body °F</th><th>Time (H)</th><th>Dur (H)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>25</td><td>600</td><td>99</td><td>86</td><td>20</td><td>12</td><td>n/a</td><td>0</td><td>3700</td><td>100–100.5</td><td>60%</td><td>n/a</td><td>–</td><td>–</td><td>–</td></tr>
+                <tr><td>26</td><td>624</td><td>98.9</td><td>90</td><td>20</td><td>12</td><td>Start Pipping</td><td>0</td><td>3700</td><td>100–100.5</td><td>71%</td><td>n/a</td><td>–</td><td>4:00</td><td>24</td></tr>
+                <tr><td>27</td><td>648</td><td>98.7</td><td>93.5</td><td>20</td><td>12</td><td>Pipping</td><td>0</td><td>3700</td><td>100–100.5</td><td>82%</td><td>n/a</td><td>–</td><td>4:00</td><td>24</td></tr>
+                <tr><td>27</td><td>660</td><td>98.6</td><td>93.5</td><td>20</td><td>12</td><td>5%</td><td>5</td><td>3700</td><td>100–100.5</td><td>82%</td><td>–</td><td>–</td><td>12:00</td><td>8</td></tr>
+                <tr><td>28</td><td>672</td><td>98.5</td><td>93.5</td><td>20</td><td>12</td><td>25–30%</td><td>25</td><td>3600</td><td>n/a</td><td>82%</td><td>n/a</td><td>–</td><td>4:00</td><td>16</td></tr>
+                <tr><td>28</td><td>684</td><td>98</td><td>90</td><td>31</td><td>25</td><td>60–70%</td><td>75</td><td>3000</td><td>n/a</td><td>73%</td><td>134°F</td><td>104–105°F</td><td>16:00</td><td>4</td></tr>
+                <tr><td>28</td><td>688</td><td>98</td><td>86</td><td>45</td><td>31</td><td>70–80%</td><td>85</td><td>2800</td><td>n/a</td><td>62%</td><td>125°F</td><td>104–105°F</td><td>20:00</td><td>4</td></tr>
+                <tr><td>28</td><td>692</td><td>97.5</td><td>85</td><td>60</td><td>45</td><td>80–90%</td><td>90</td><td>2700</td><td>n/a</td><td>61%</td><td>120°F</td><td>104–105°F</td><td>24:00</td><td>4</td></tr>
+                <tr class="takeoff"><td>29</td><td>Hatch Day</td><td>97</td><td>85</td><td>70</td><td>50</td><td>Take-Off</td><td>95</td><td>2700</td><td>n/a</td><td>61%</td><td>120°F</td><td>–</td><td>–</td><td>4</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="table-caption">Hum% / RH% are separate sensor readings in the source program — both are kept as recorded.</p>
+        </div></div>
+      </div>
+
+      <div class="acc" data-acc="8">
+        <div class="acc-head">
+          <span class="acc-num">8</span>
+          <span class="acc-title">Hatch Window — What to Check</span>
+          <span class="acc-chev">▾</span>
+        </div>
+        <div class="acc-body"><div class="acc-body-inner">
+          <div class="img-placeholder"><span class="ph-icon">▤</span>Reference: Ideal hatch spread photo — refer to printed SOP</div>
+          <p>Hatch spread should look closely similar to the reference. Also assess these physical attributes for hatch timing:</p>
+          <ul class="checklist">
+            <li><span class="cbox"></span><span><b>Damp feathers:</b> expect slightly damp feathers at the back/neck on a few ducklings (~5% at take-off).</span></li>
+            <li><span class="cbox"></span><span><b>Hocks/feet:</b> should not be dry or skinny. Protruding veins around the hock/feet indicate the bird stayed in the hatcher too long and is possibly dehydrated.</span></li>
+            <li><span class="cbox"></span><span><b>Meconium level:</b> too much poop in the eggs indicates birds stayed longer in the hatcher and started secreting to cool themselves.</span></li>
+            <li><span class="cbox"></span><span><b>Hatch quality check:</b> perform during grading and record the hatch score.</span></li>
+          </ul>
+          <div class="img-placeholder"><span class="ph-icon">▤</span>Reference: Meconium level photo — refer to printed SOP</div>
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== LIVE PROFILE VIEW ==================== -->
+  <div id="view-profile" style="display:none">
+    <div class="panel">
+      <p class="panel-title">Step-Down Reference</p>
+      <div class="comfort-strip">
+        <div class="kpi"><div class="klabel">Target EST</div><div class="kvalue">100–100.5°F</div></div>
+        <div class="kpi"><div class="klabel">Comfort cloacal</div><div class="kvalue">104–105°F</div></div>
+      </div>
+      <p class="guide-intro" style="margin-bottom:0">Read the dry bulb and wet bulb thermometers on the hatcher and enter them below — RH%, dew point, and heat index update live as you step the temperature down.</p>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Hatcher Readings (°F)</p>
+
+      <div class="stage-field">
+        <label>Incubation Day <span class="stage-hint">(loads a preset — still fully editable)</span></label>
+        <select id="hpStage">
+          <option value="">— Manual entry —</option>
+          <option value="0">Day 25 · 600h</option>
+          <option value="1">Day 26 · 624h — Start Pipping</option>
+          <option value="2">Day 27 · 648h — Pipping</option>
+          <option value="3">Day 27 · 660h — 5% Hatched</option>
+          <option value="4">Day 28 · 672h — 25–30% Hatched</option>
+          <option value="5">Day 28 · 684h — 60–70% Hatched</option>
+          <option value="6">Day 28 · 688h — 70–80% Hatched</option>
+          <option value="7">Day 28 · 692h — 80–90% Hatched</option>
+          <option value="8">Day 29 · Take-Off — 95% Hatched</option>
+        </select>
+        <div class="stage-note" id="hpStageNote">Pick a day to auto-fill the recommended dry bulb and wet bulb for that step, then adjust either field to match your actual reading.</div>
+      </div>
+
+      <div class="field">
+        <label>Dry bulb</label>
+        <div><input type="number" id="hpTdb" step="0.1" value="98.0"><span class="unit-inline">°F</span></div>
+      </div>
+
+      <div class="field">
+        <label>Wet bulb</label>
+        <div><input type="number" id="hpTwb" step="0.1" value="90.0"><span class="unit-inline">°F</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Live Reading</p>
+      <div class="results">
+        <div class="tile rh">
+          <div class="tlabel"><span>Relative Humidity</span></div>
+          <div class="tvalue" id="hpRhOut">-- %</div>
+          <div class="tnote">% saturation at dry bulb</div>
+        </div>
+        <div class="tile dp">
+          <div class="tlabel"><span>Dew Point</span></div>
+          <div class="tvalue" id="hpDpOut">-- °F</div>
+          <div class="tnote">Condensation onset temp</div>
+        </div>
+        <div class="tile hi">
+          <div class="tlabel"><span>Heat Index</span></div>
+          <div class="tvalue" id="hpHiOut">-- °C</div>
+          <div class="tnote" id="hpHiNote">Feels-like temp</div>
+        </div>
+        <div class="hi-guide">
+          <div class="hi-guide-title">Duck HI Guide</div>
+          <div class="hi-guide-row ok"><span class="dot"></span>~48–59°C typical for this posted program (pipping → take-off)</div>
+          <div class="hi-guide-row warn"><span class="dot"></span>Outside that band → spot-check cloacal temp</div>
+          <div class="hi-guide-note">Cloacal comfort target: 40.0–40.6°C (104–105°F)</div>
+        </div>
+      </div>
+      <div class="warn" id="hpWarnBox" style="display:none"></div>
+      <div class="warn">Calculated at standard sea-level pressure (1013.25 hPa). Use the Psychrometrics tab's station pressure field if your hatcher room needs a correction.</div>
+      <div class="warn">The HI guide is calibrated to <b>your own posted step-down program</b>, not a universal duck standard — there's no citable duck-specific heat-index safety threshold in the literature. Treat cloacal temperature and bird behavior as ground truth, and confirm limits with your flock vet or hatchery specialist.</div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Record This Reading</p>
+      <div class="field" id="field-active-batch-note">
+        <label>Active batch</label>
+        <div id="hpActiveBatchLabel" style="font-size:12px; color:var(--amber); font-weight:700;">None selected</div>
+      </div>
+      <button class="btn primary" id="hpRecordBtn">Save reading to batch</button>
+      <div class="stage-note" id="hpRecordNote"></div>
+    </div>
+  </div>
+
+  <!-- ==================== BATCHES VIEW ==================== -->
+  <div id="view-batches" style="display:none">
+
+    <div class="panel">
+      <p class="panel-title">Batches <span class="sync-pill local" id="syncPill"><span class="dot"></span><span id="syncPillText">Local only</span></span></p>
+      <div class="field">
+        <label>New batch name</label>
+        <div><input type="text" id="newBatchName" placeholder="e.g. Shed 2 – Aug batch"></div>
+      </div>
+      <div class="field">
+        <label>Setter start date</label>
+        <div><input type="date" id="newBatchDate"></div>
+      </div>
+      <button class="btn primary" id="addBatchBtn">+ Start New Batch</button>
+    </div>
+
+    <div class="panel" id="batchListPanel">
+      <p class="panel-title">All Batches</p>
+      <div class="batch-list" id="batchList"></div>
+    </div>
+
+    <div class="panel" id="batchDetailPanel" style="display:none">
+      <p class="panel-title">
+        <span id="batchDetailName">Batch</span>
+        <span class="chip" id="deleteBatchBtn" style="color:var(--coral); border-color:#6b3a2c;">Delete batch</span>
+      </p>
+
+      <div class="chart-block">
+        <div class="chart-label"><span>Dry Bulb °F</span><span class="cval" id="chartTdbVal">--</span></div>
+        <svg class="chart-svg" id="chartTdb" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-block">
+        <div class="chart-label"><span>Relative Humidity %</span><span class="cval" id="chartRhVal">--</span></div>
+        <svg class="chart-svg" id="chartRh" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-block">
+        <div class="chart-label"><span>Heat Index °C</span><span class="cval" id="chartHiVal">--</span></div>
+        <svg class="chart-svg" id="chartHi" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div class="table-scroll">
+        <table class="readings-table">
+          <thead>
+            <tr><th>Time</th><th>Stage</th><th>Tdb °F</th><th>Twb °F</th><th>RH %</th><th>DP °F</th><th>HI °C</th><th></th></tr>
+          </thead>
+          <tbody id="readingsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="readingsEmpty" style="display:none">No readings recorded yet. Go to the Live Profile tab and tap "Save reading to batch".</div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <div class="btn small ghost" id="exportCsvBtn" style="flex:1; text-align:center;">Export CSV</div>
+        <div class="btn small ghost" id="syncNowBtn" style="flex:1; text-align:center;">Sync now</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Cloud Sync Setup <span class="adv-toggle" id="syncAdvToggle" style="text-decoration:underline; cursor:pointer;">▾</span></p>
+      <div class="adv-wrap" id="syncAdvWrap">
+        <p class="guide-intro">Paste your Supabase project URL and anon (public) key to sync batches across devices. Leave blank to keep everything local-only. See SETUP.md for the one-time database setup.</p>
+        <div class="field">
+          <label>Project URL</label>
+          <div><input type="text" id="supaUrl" placeholder="https://xxxx.supabase.co" style="width:180px; text-align:left;"></div>
+        </div>
+        <div class="field">
+          <label>Anon key</label>
+          <div><input type="text" id="supaKey" placeholder="eyJhbGciOi..." style="width:180px; text-align:left;"></div>
+        </div>
+        <button class="btn ghost" id="saveSupaBtn">Save & Sync</button>
+        <div class="warn">The anon key is not a secret password by itself, but treat your project URL + key like a shared login for this data — don't post them publicly. Stored only in this browser's local storage.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Buck (1996) saturation vapor pressure · WMO psychrometer equation<br>
+    NWS Rothfusz heat index regression<br>
+    Works fully offline once installed — batch data syncs to the cloud when a connection is available.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  const state = { view:'psychro', mode:'twb', unit:'C' };
+
+  const tdbEl = document.getElementById('tdb');
+  const twbEl = document.getElementById('twb');
+  const rhEl  = document.getElementById('rhInput');
+  const hiEl  = document.getElementById('hiInput');
+  const pEl   = document.getElementById('pressure');
+  const convC = document.getElementById('convC');
+  const convF = document.getElementById('convF');
+
+  // ---------- Core psychrometric math (all internal calc in °C, hPa) ----------
+  const A_PSYCH = 0.000662; // ventilated psychrometer coefficient, per °C
+
+  function satVaporPressure(Tc){ // Buck 1996, hPa
+    return 6.1121 * Math.exp((18.678 - Tc/234.5) * (Tc/(257.14+Tc)));
+  }
+  function dewPointFromE(e){ // returns °C
+    const eSafe = Math.max(e, 1e-6); // avoid -Infinity/NaN at e→0 (bone-dry air)
+    const g = Math.log(eSafe/6.1121);
+    return 257.14 * g / (18.678 - g);
+  }
+  function actualVaporPressure(TdbC, TwbC, P){
+    return satVaporPressure(TwbC) - A_PSYCH * P * (TdbC - TwbC);
+  }
+  function heatIndexF(Tf, RH){
+    let HI = 0.5 * (Tf + 61.0 + ((Tf - 68.0) * 1.2) + (RH * 0.094));
+    const avg = (HI + Tf) / 2;
+    if (avg >= 80){
+      HI = -42.379 + 2.04901523*Tf + 10.14333127*RH - 0.22475541*Tf*RH
+           - 0.00683783*Tf*Tf - 0.05481717*RH*RH + 0.00122874*Tf*Tf*RH
+           + 0.00085282*Tf*RH*RH - 0.00000199*Tf*Tf*RH*RH;
+      if (RH < 13 && Tf >= 80 && Tf <= 112){
+        HI -= ((13-RH)/4) * Math.sqrt((17-Math.abs(Tf-95))/17);
+      } else if (RH > 85 && Tf >= 80 && Tf <= 87){
+        HI += ((RH-85)/10) * ((87-Tf)/5);
+      }
+    }
+    return HI;
+  }
+  function solveWetBulb(TdbC, RH, P){
+    const esTdb = satVaporPressure(TdbC);
+    const eTarget = (RH/100) * esTdb;
+    let lo = dewPointFromE(eTarget);
+    let hi = TdbC;
+    if (lo > hi) lo = hi - 0.05;
+    function f(Twb){ return satVaporPressure(Twb) - A_PSYCH*P*(TdbC-Twb) - eTarget; }
+    for (let i=0;i<60;i++){
+      const mid = (lo+hi)/2;
+      if (f(mid) < 0) lo = mid; else hi = mid;
+    }
+    return (lo+hi)/2;
+  }
+  // Invert heat index -> RH by scanning (heat index is not strictly monotonic
+  // at the extreme low-RH corner of the Rothfusz regression, so a scan+interp
+  // is more robust than a plain bisection).
+  function solveRHFromHI(TdbC, HiC, P){
+    const TdbF = TdbC*9/5+32;
+    const targetF = HiC*9/5+32;
+    let prevRH = 0, prevVal = heatIndexF(TdbF,0) - targetF;
+    for (let rh=1; rh<=100; rh++){
+      const val = heatIndexF(TdbF, rh) - targetF;
+      if ((prevVal <= 0 && val >= 0) || (prevVal >= 0 && val <= 0)){
+        const t = (prevVal === val) ? 0 : prevVal/(prevVal-val);
+        return { rh: Math.max(0, Math.min(100, prevRH + t*(rh-prevRH))), clamped:false };
+      }
+      prevRH = rh; prevVal = val;
+    }
+    const boundary = heatIndexF(TdbF,100) < targetF ? 100 : 0;
+    return { rh: boundary, clamped:true };
+  }
+
+  // ---------- Unit helpers ----------
+  const toC = (v) => state.unit === 'F' ? (v-32)*5/9 : v;
+  const fromC = (v) => state.unit === 'F' ? v*9/5+32 : v;
+  const fmt = (v) => (Math.round(v*10)/10).toFixed(1);
+  const uLabel = () => state.unit === 'F' ? '°F' : '°C';
+
+  // ---------- Connection badge ----------
+  function updateConnBadge(){
+    const el = document.getElementById('connBadge');
+    if (navigator.onLine){
+      el.textContent = '● ONLINE';
+      el.classList.remove('offline');
+    } else {
+      el.textContent = '● OFFLINE — NO DATA CONNECTION';
+      el.classList.add('offline');
+    }
+  }
+  window.addEventListener('online', ()=>{ updateConnBadge(); trySync(); });
+  window.addEventListener('offline', updateConnBadge);
+  updateConnBadge();
+
+  // ---------- App-level view tabs ----------
+  document.querySelectorAll('.app-tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      document.querySelectorAll('.app-tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      state.view = t.dataset.view;
+      document.getElementById('view-psychro').style.display = state.view==='psychro' ? 'block':'none';
+      document.getElementById('view-convert').style.display = state.view==='convert' ? 'block':'none';
+      document.getElementById('view-guide').style.display   = state.view==='guide'   ? 'block':'none';
+      document.getElementById('view-profile').style.display = state.view==='profile' ? 'block':'none';
+      document.getElementById('view-batches').style.display = state.view==='batches' ? 'block':'none';
+      if (state.view === 'batches') renderBatches();
+      if (state.view === 'profile') refreshActiveBatchLabel();
+    });
+  });
+
+  // ---------- Known-value segmented control ----------
+  document.querySelectorAll('.seg-item').forEach(s=>{
+    s.addEventListener('click', ()=>{
+      document.querySelectorAll('.seg-item').forEach(x=>x.classList.remove('active'));
+      s.classList.add('active');
+      state.mode = s.dataset.mode;
+      document.getElementById('field-twb').style.display = state.mode==='twb' ? 'flex':'none';
+      document.getElementById('field-rh').style.display  = state.mode==='rh'  ? 'flex':'none';
+      document.getElementById('field-hi').style.display  = state.mode==='hi'  ? 'flex':'none';
+      compute();
+    });
+  });
+
+  // ---------- Unit toggle (°C / °F) ----------
+  document.querySelectorAll('.unit-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const newUnit = b.dataset.unit;
+      if (newUnit === state.unit) return;
+      const tdbC = toC(parseFloat(tdbEl.value));
+      const twbC = toC(parseFloat(twbEl.value));
+      const hiC  = toC(parseFloat(hiEl.value));
+      state.unit = newUnit;
+      document.querySelectorAll('.unit-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById('u-tdb').textContent = uLabel();
+      document.getElementById('u-twb').textContent = uLabel();
+      document.getElementById('u-hi').textContent  = uLabel();
+      tdbEl.value = fmt(fromC(tdbC));
+      twbEl.value = fmt(fromC(twbC));
+      hiEl.value  = fmt(fromC(hiC));
+      compute();
+    });
+  });
+
+  document.getElementById('advToggle').addEventListener('click', ()=>{
+    document.getElementById('advWrap').classList.toggle('open');
+  });
+
+  [tdbEl, twbEl, rhEl, hiEl, pEl].forEach(el=>{
+    el.addEventListener('input', compute);
+  });
+
+  function setTile(id, tagId, isInput){
+    document.getElementById(id).classList.toggle('is-input', isInput);
+    document.getElementById(tagId).style.display = isInput ? 'inline-block' : 'none';
+  }
+
+  function compute(){
+    const P = parseFloat(pEl.value) || 1013.25;
+    const tdbC = toC(parseFloat(tdbEl.value));
+    const warnBox = document.getElementById('warnBox');
+    warnBox.style.display = 'none';
+    warnBox.innerHTML = '';
+
+    setTile('tile-rh','tag-rh', state.mode==='rh');
+    setTile('tile-twb','tag-twb', state.mode==='twb');
+    setTile('tile-hi','tag-hi', state.mode==='hi');
+
+    if (isNaN(tdbC)) return;
+
+    let RH, twbC, dpC, hiC;
+
+    if (state.mode === 'twb'){
+      twbC = toC(parseFloat(twbEl.value));
+      if (isNaN(twbC)) return;
+      if (twbC > tdbC){
+        warnBox.style.display = 'block';
+        warnBox.innerHTML = '<b>Check inputs:</b> wet bulb cannot read higher than dry bulb.';
+      }
+      const e = actualVaporPressure(tdbC, twbC, P);
+      const esTdb = satVaporPressure(tdbC);
+      RH = Math.max(0, Math.min(100, 100 * e / esTdb));
+      dpC = dewPointFromE(e);
+      const hiF = heatIndexF(tdbC*9/5+32, RH);
+      hiC = (hiF-32)*5/9;
+
+    } else if (state.mode === 'rh'){
+      RH = parseFloat(rhEl.value);
+      if (isNaN(RH)) return;
+      if (RH < 0 || RH > 100){
+        warnBox.style.display = 'block';
+        warnBox.innerHTML = '<b>Check inputs:</b> relative humidity must be between 0% and 100%.';
+      }
+      const RHc = Math.max(0, Math.min(100, RH));
+      twbC = solveWetBulb(tdbC, RHc, P);
+      const e = (RHc/100) * satVaporPressure(tdbC);
+      dpC = dewPointFromE(e);
+      const hiF = heatIndexF(tdbC*9/5+32, RHc);
+      hiC = (hiF-32)*5/9;
+
+    } else { // mode === 'hi'
+      hiC = toC(parseFloat(hiEl.value));
+      if (isNaN(hiC)) return;
+      const solved = solveRHFromHI(tdbC, hiC, P);
+      RH = solved.rh;
+      if (solved.clamped){
+        warnBox.style.display = 'block';
+        warnBox.innerHTML = '<b>Note:</b> that heat index isn\'t reachable at this dry bulb — RH was clamped to ' + (RH===100?'100%':'0%') + '.';
+      }
+      twbC = solveWetBulb(tdbC, RH, P);
+      const e = (RH/100) * satVaporPressure(tdbC);
+      dpC = dewPointFromE(e);
+    }
+
+    document.getElementById('rhOut').textContent  = fmt(RH) + ' %';
+    document.getElementById('twbOut').textContent = fmt(fromC(twbC)) + ' ' + uLabel();
+    document.getElementById('dpOut').textContent  = fmt(fromC(dpC)) + ' ' + uLabel();
+    document.getElementById('hiOut').textContent  = fmt(fromC(hiC)) + ' ' + uLabel();
+    document.getElementById('hiNote').textContent = tdbC < 26.7 ? 'Below HI threshold — ≈ actual temp' : 'Feels-like temp';
+  }
+
+  // ---------- Converter view ----------
+  let convLock = false;
+  convC.addEventListener('input', ()=>{
+    if (convLock) return;
+    const c = parseFloat(convC.value);
+    if (isNaN(c)) return;
+    convLock = true;
+    convF.value = (Math.round((c*9/5+32)*10)/10).toString();
+    convLock = false;
+  });
+  convF.addEventListener('input', ()=>{
+    if (convLock) return;
+    const f = parseFloat(convF.value);
+    if (isNaN(f)) return;
+    convLock = true;
+    convC.value = (Math.round(((f-32)*5/9)*10)/10).toString();
+    convLock = false;
+  });
+  document.querySelectorAll('#convChips .chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      convC.value = chip.dataset.c;
+      convC.dispatchEvent(new Event('input'));
+    });
+  });
+
+  // ---------- Hatcher guide accordion ----------
+  document.querySelectorAll('.acc-head').forEach(head=>{
+    head.addEventListener('click', ()=>{
+      head.closest('.acc').classList.toggle('open');
+    });
+  });
+
+  // ---------- Live Profile (hatcher dry bulb / wet bulb, always °F) ----------
+  const hpTdbEl = document.getElementById('hpTdb');
+  const hpTwbEl = document.getElementById('hpTwb');
+  const hpStageEl = document.getElementById('hpStage');
+  const hpStageNoteEl = document.getElementById('hpStageNote');
+  const STD_PRESSURE = 1013.25;
+  let hpLast = null; // last computed reading, for "Save reading to batch"
+
+  // Target dry bulb + target RH% per step, taken from the posted step-down program.
+  // Wet bulb is not listed there directly — it's derived live from temp+RH below.
+  const HATCH_SCHEDULE = [
+    { label:'Day 25 · 600h',                            tempF:99.0, rh:60 },
+    { label:'Day 26 · 624h — Start Pipping',             tempF:98.9, rh:71 },
+    { label:'Day 27 · 648h — Pipping',                   tempF:98.7, rh:82 },
+    { label:'Day 27 · 660h — 5% Hatched',                tempF:98.6, rh:82 },
+    { label:'Day 28 · 672h — 25–30% Hatched',            tempF:98.5, rh:82 },
+    { label:'Day 28 · 684h — 60–70% Hatched',            tempF:98.0, rh:73 },
+    { label:'Day 28 · 688h — 70–80% Hatched',            tempF:98.0, rh:62 },
+    { label:'Day 28 · 692h — 80–90% Hatched',            tempF:97.5, rh:61 },
+    { label:'Day 29 · Take-Off — 95% Hatched',           tempF:97.0, rh:61 },
+  ];
+
+  hpStageEl.addEventListener('change', ()=>{
+    if (hpStageEl.value === ''){
+      hpStageNoteEl.innerHTML = 'Pick a day to auto-fill the recommended dry bulb and wet bulb for that step, then adjust either field to match your actual reading.';
+      return;
+    }
+    const stage = HATCH_SCHEDULE[parseInt(hpStageEl.value, 10)];
+    const tdbC = (stage.tempF - 32) * 5/9;
+    const twbC = solveWetBulb(tdbC, stage.rh, STD_PRESSURE);
+    const twbF = twbC * 9/5 + 32;
+
+    hpTdbEl.value = stage.tempF.toFixed(1);
+    hpTwbEl.value = fmt(twbF);
+    hpStageNoteEl.innerHTML = '<b>Preset loaded:</b> ' + stage.tempF.toFixed(1) + '°F dry bulb targeting ' + stage.rh + '% RH → recommended wet bulb ' + fmt(twbF) + '°F. Both fields below are still yours to adjust to your actual thermometer readings.';
+    hpCompute();
+  });
+
+  function hpCompute(){
+    const tdbF = parseFloat(hpTdbEl.value);
+    const twbF = parseFloat(hpTwbEl.value);
+    const hpWarnBox = document.getElementById('hpWarnBox');
+    hpWarnBox.style.display = 'none';
+    hpWarnBox.innerHTML = '';
+
+    if (isNaN(tdbF) || isNaN(twbF)) { hpLast = null; return; }
+
+    if (twbF > tdbF){
+      hpWarnBox.style.display = 'block';
+      hpWarnBox.innerHTML = '<b>Check readings:</b> wet bulb cannot read higher than dry bulb.';
+    }
+
+    const tdbC = (tdbF - 32) * 5/9;
+    const twbC = (twbF - 32) * 5/9;
+    const e = actualVaporPressure(tdbC, twbC, STD_PRESSURE);
+    const esTdb = satVaporPressure(tdbC);
+    const RH = Math.max(0, Math.min(100, 100 * e / esTdb));
+    const dpC = dewPointFromE(e);
+    const dpF = dpC * 9/5 + 32;
+    const hiF = heatIndexF(tdbF, RH);
+    const hiC = (hiF - 32) * 5/9;
+
+    document.getElementById('hpRhOut').textContent = fmt(RH) + ' %';
+    document.getElementById('hpDpOut').textContent = fmt(dpF) + ' °F';
+    document.getElementById('hpHiOut').textContent = fmt(hiC) + ' °C';
+    document.getElementById('hpHiNote').textContent = tdbF < 80 ? 'Below HI threshold — ≈ actual temp' : 'Feels-like temp';
+
+    hpLast = {
+      stageLabel: hpStageEl.value === '' ? 'Manual' : HATCH_SCHEDULE[parseInt(hpStageEl.value,10)].label,
+      tdbF: Math.round(tdbF*10)/10,
+      twbF: Math.round(twbF*10)/10,
+      rhPct: Math.round(RH*10)/10,
+      dpF: Math.round(dpF*10)/10,
+      hiC: Math.round(hiC*10)/10
+    };
+  }
+
+  [hpTdbEl, hpTwbEl].forEach(el=>{
+    el.addEventListener('input', hpCompute);
+  });
+
+  // ==================================================================
+  // ---------------------- Batch data recording ---------------------
+  // ==================================================================
+  const LS_BATCHES  = 'psychro_batches_v1';
+  const LS_READINGS = 'psychro_readings_v1';
+  const LS_ACTIVE   = 'psychro_active_batch_v1';
+  const LS_SUPA     = 'psychro_supabase_cfg_v1';
+
+  function loadJSON(key, fallback){
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch(e){ return fallback; }
+  }
+  function saveJSON(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function nowISO(){ return new Date().toISOString(); }
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+  let batches = loadJSON(LS_BATCHES, []);
+  let readings = loadJSON(LS_READINGS, []);
+  let activeBatchId = localStorage.getItem(LS_ACTIVE) || null;
+  let supaCfg = loadJSON(LS_SUPA, {url:'', key:''});
+  let openBatchDetailId = null;
+
+  document.getElementById('supaUrl').value = supaCfg.url || '';
+  document.getElementById('supaKey').value = supaCfg.key || '';
+  document.getElementById('newBatchDate').value = todayISO();
+
+  function persistBatches(){ saveJSON(LS_BATCHES, batches); }
+  function persistReadings(){ saveJSON(LS_READINGS, readings); }
+
+  function activeBatch(){ return batches.find(b=>b.id===activeBatchId) || null; }
+
+  function refreshActiveBatchLabel(){
+    const b = activeBatch();
+    document.getElementById('hpActiveBatchLabel').textContent = b ? b.name : 'None selected — pick one in the Batches tab';
+    document.getElementById('hpRecordBtn').disabled = !b;
+  }
+
+  document.getElementById('addBatchBtn').addEventListener('click', ()=>{
+    const nameInput = document.getElementById('newBatchName');
+    const dateInput = document.getElementById('newBatchDate');
+    const name = nameInput.value.trim() || ('Batch ' + new Date().toLocaleDateString());
+    const setDate = dateInput.value || todayISO();
+    const b = { id: uid(), name, setDate, createdAt: nowISO(), updatedAt: nowISO() };
+    batches.push(b);
+    persistBatches();
+    activeBatchId = b.id;
+    localStorage.setItem(LS_ACTIVE, activeBatchId);
+    nameInput.value = '';
+    renderBatches();
+    trySync();
+  });
+
+  function selectBatch(id){
+    activeBatchId = id;
+    localStorage.setItem(LS_ACTIVE, id);
+    openBatchDetailId = id;
+    renderBatches();
+    refreshActiveBatchLabel();
+  }
+
+  function deleteBatch(id){
+    batches = batches.filter(b=>b.id!==id);
+    readings = readings.filter(r=>r.batchId!==id);
+    persistBatches(); persistReadings();
+    if (activeBatchId===id){ activeBatchId = batches.length ? batches[0].id : null; localStorage.setItem(LS_ACTIVE, activeBatchId||''); }
+    if (openBatchDetailId===id) openBatchDetailId = null;
+    renderBatches();
+    refreshActiveBatchLabel();
+    trySync();
+  }
+
+  function dayOfIncubation(setDate){
+    if (!setDate) return null;
+    const d0 = new Date(setDate + 'T00:00:00');
+    const diff = Math.floor((new Date() - d0) / 86400000) + 1;
+    return diff;
+  }
+
+  function renderBatches(){
+    const listEl = document.getElementById('batchList');
+    listEl.innerHTML = '';
+    if (!batches.length){
+      listEl.innerHTML = '<div class="empty-state">No batches yet. Start one above to begin recording readings.</div>';
+    } else {
+      batches.slice().sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)).forEach(b=>{
+        const count = readings.filter(r=>r.batchId===b.id).length;
+        const day = dayOfIncubation(b.setDate);
+        const card = document.createElement('div');
+        card.className = 'batch-card' + (b.id===activeBatchId ? ' active' : '');
+        card.innerHTML = '<div class="bname">' + escapeHtml(b.name) + (b.id===activeBatchId ? ' · active' : '') + '</div>' +
+          '<div class="bmeta">Set ' + b.setDate + (day!==null ? ' · Day ' + day : '') + '</div>' +
+          '<div class="bcount">' + count + ' reading' + (count===1?'':'s') + ' recorded</div>';
+        card.addEventListener('click', ()=> selectBatch(b.id));
+        listEl.appendChild(card);
+      });
+    }
+    renderBatchDetail();
+    refreshActiveBatchLabel();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderBatchDetail(){
+    const detailId = openBatchDetailId || activeBatchId;
+    const panel = document.getElementById('batchDetailPanel');
+    const b = batches.find(x=>x.id===detailId);
+    if (!b){ panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('batchDetailName').textContent = b.name;
+
+    const rows = readings.filter(r=>r.batchId===b.id).sort((a,b2)=> new Date(a.ts) - new Date(b2.ts));
+    const tbody = document.getElementById('readingsBody');
+    tbody.innerHTML = '';
+    document.getElementById('readingsEmpty').style.display = rows.length ? 'none' : 'block';
+
+    rows.slice().reverse().forEach(r=>{
+      const tr = document.createElement('tr');
+      const t = new Date(r.ts);
+      const timeLabel = t.toLocaleDateString() + ' ' + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      tr.innerHTML = '<td>' + timeLabel + '</td><td style="text-align:left">' + escapeHtml(r.stageLabel||'') + '</td>' +
+        '<td>' + r.tdbF + '</td><td>' + r.twbF + '</td><td>' + r.rhPct + '</td><td>' + r.dpF + '</td><td>' + r.hiC + '</td>' +
+        '<td><span class="del-btn" data-id="' + r.id + '">✕</span></td>';
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('.del-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        readings = readings.filter(r=>r.id!==btn.dataset.id);
+        persistReadings();
+        renderBatchDetail();
+        trySync();
+      });
+    });
+
+    drawChart('chartTdb', 'chartTdbVal', rows.map(r=>r.tdbF), '#ffb454', '°F');
+    drawChart('chartRh',  'chartRhVal',  rows.map(r=>r.rhPct), '#5fd8cf', '%');
+    drawChart('chartHi',  'chartHiVal',  rows.map(r=>r.hiC),   '#ff8a68', '°C');
+  }
+
+  function drawChart(svgId, valId, values, color, unit){
+    const svg = document.getElementById(svgId);
+    const valEl = document.getElementById(valId);
+    if (!values.length){
+      svg.innerHTML = '';
+      valEl.textContent = '--';
+      return;
+    }
+    valEl.textContent = values[values.length-1] + ' ' + unit;
+    const w = 300, h = 64, pad = 6;
+    const min = Math.min.apply(null, values);
+    const max = Math.max.apply(null, values);
+    const range = (max - min) || 1;
+    const pts = values.map((v,i)=>{
+      const x = values.length===1 ? w/2 : pad + (i/(values.length-1)) * (w - pad*2);
+      const y = h - pad - ((v - min) / range) * (h - pad*2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    let svgContent = '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+    pts.forEach(p=>{
+      const [x,y] = p.split(',');
+      svgContent += '<circle cx="' + x + '" cy="' + y + '" r="2.5" fill="' + color + '"/>';
+    });
+    svg.innerHTML = svgContent;
+  }
+
+  document.getElementById('deleteBatchBtn').addEventListener('click', ()=>{
+    const detailId = openBatchDetailId || activeBatchId;
+    const b = batches.find(x=>x.id===detailId);
+    if (b) deleteBatch(b.id);
+  });
+
+  document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
+    const detailId = openBatchDetailId || activeBatchId;
+    const b = batches.find(x=>x.id===detailId);
+    if (!b) return;
+    const rows = readings.filter(r=>r.batchId===b.id).sort((a,b2)=> new Date(a.ts) - new Date(b2.ts));
+    const header = ['Timestamp','Stage','Dry Bulb F','Wet Bulb F','RH %','Dew Point F','Heat Index C'];
+    const csvEsc = s => { s = String(s==null?'':s); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+    const lines = [header.join(',')].concat(rows.map(r=>[r.ts, csvEsc(r.stageLabel), r.tdbF, r.twbF, r.rhPct, r.dpF, r.hiC].join(',')));
+    const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (b.name || 'batch').replace(/[^a-z0-9]+/gi,'_') + '-readings.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------- Record reading from Live Profile ----------
+  document.getElementById('hpRecordBtn').addEventListener('click', ()=>{
+    const note = document.getElementById('hpRecordNote');
+    if (!activeBatchId){
+      note.textContent = 'No active batch — go to the Batches tab and start or select one first.';
+      return;
+    }
+    if (!hpLast){
+      note.textContent = 'Enter a valid dry bulb and wet bulb reading first.';
+      return;
+    }
+    const r = Object.assign({ id: uid(), batchId: activeBatchId, ts: nowISO(), updatedAt: nowISO() }, hpLast);
+    readings.push(r);
+    persistReadings();
+    note.textContent = 'Saved to "' + activeBatch().name + '" at ' + new Date(r.ts).toLocaleTimeString();
+    trySync();
+  });
+
+  // ---------- Sync status pill ----------
+  function updateSyncStatus(stateName, extra){
+    const pill = document.getElementById('syncPill');
+    const text = document.getElementById('syncPillText');
+    pill.className = 'sync-pill ' + stateName;
+    const labels = {
+      local: 'Local only',
+      pending: 'Offline — pending sync',
+      syncing: 'Syncing…',
+      synced: 'Synced ✓',
+      error: 'Sync error — will retry'
+    };
+    text.textContent = labels[stateName] || stateName;
+    if (extra) text.textContent += ' ' + extra;
+  }
+
+  async function supaFetch(path, opts){
+    const base = supaCfg.url.replace(/\/$/,'');
+    const headers = Object.assign({
+      'apikey': supaCfg.key,
+      'Authorization': 'Bearer ' + supaCfg.key,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=representation'
+    }, (opts && opts.headers) || {});
+    const res = await fetch(base + '/rest/v1/' + path, Object.assign({}, opts, {headers}));
+    if (!res.ok) throw new Error('Supabase error ' + res.status);
+    try { return await res.json(); } catch(e){ return null; }
+  }
+
+  function mergeById(local, remote){
+    const map = new Map(local.map(x=>[x.id, x]));
+    remote.forEach(r=>{
+      const l = map.get(r.id);
+      if (!l || new Date(r.updatedAt) > new Date(l.updatedAt)) map.set(r.id, r);
+    });
+    return Array.from(map.values());
+  }
+
+  let syncing = false;
+  async function trySync(){
+    if (!supaCfg.url || !supaCfg.key){ updateSyncStatus('local'); return; }
+    if (!navigator.onLine){ updateSyncStatus('pending'); return; }
+    if (syncing) return;
+    syncing = true;
+    updateSyncStatus('syncing');
+    try {
+      if (batches.length) await supaFetch('batches?on_conflict=id', { method:'POST', body: JSON.stringify(batches) });
+      if (readings.length) await supaFetch('readings?on_conflict=id', { method:'POST', body: JSON.stringify(readings) });
+      const remoteBatches = await supaFetch('batches?select=*') || [];
+      const remoteReadings = await supaFetch('readings?select=*') || [];
+      batches = mergeById(batches, remoteBatches);
+      readings = mergeById(readings, remoteReadings);
+      persistBatches(); persistReadings();
+      renderBatches();
+      updateSyncStatus('synced', new Date().toLocaleTimeString());
+    } catch(e){
+      updateSyncStatus('error');
+    } finally {
+      syncing = false;
+    }
+  }
+
+  document.getElementById('syncAdvToggle').addEventListener('click', ()=>{
+    document.getElementById('syncAdvWrap').classList.toggle('open');
+  });
+  document.getElementById('saveSupaBtn').addEventListener('click', ()=>{
+    supaCfg = { url: document.getElementById('supaUrl').value.trim(), key: document.getElementById('supaKey').value.trim() };
+    saveJSON(LS_SUPA, supaCfg);
+    trySync();
+  });
+  document.getElementById('syncNowBtn').addEventListener('click', trySync);
+
+  // ---------- Service worker registration (offline caching) ----------
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    });
+  }
+
+  compute();
+  hpCompute();
+  renderBatches();
+  refreshActiveBatchLabel();
+  trySync();
+})();
+</script>
+</body>
+</html>
